@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>上海市公园绿地与可达性分析 - WebGIS应用</title>
+    
+    <link rel="stylesheet" href="https://js.arcgis.com/4.34/esri/themes/light/main.css">
+    <script src="https://js.arcgis.com/4.34/"></script>
+
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+        }
+        .header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 12px 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            z-index: 10;
+            flex-shrink: 0;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            display: inline-block;
+        }
+        .header p {
+            margin: 5px 0 0;
+            font-size: 0.8rem;
+            opacity: 0.8;
+        }
+        .map-container {
+            flex-grow: 1;
+            position: relative;
+            background-color: #f0f0f0;
+        }
+        #viewDiv {
+            width: 100%;
+            height: 100%;
+        }
+        .footer {
+            background-color: #34495e;
+            color: #ecf0f1;
+            text-align: center;
+            padding: 8px;
+            font-size: 0.75rem;
+            flex-shrink: 0;
+        }
+        /* 自定义控件容器样式 */
+        .widget-container {
+            position: absolute;
+            top: 70px;
+            right: 15px;
+            z-index: 99;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-width: 280px;
+        }
+        .widget-card {
+            background: white;
+            border-radius: 4px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .widget-title {
+            background: #f5f5f5;
+            padding: 6px 10px;
+            font-size: 13px;
+            font-weight: bold;
+            border-bottom: 1px solid #ddd;
+            color: #333;
+        }
+        .widget-content {
+            padding: 8px;
+        }
+        /* 自定义搜索框样式 */
+        .custom-search {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            z-index: 100;
+            background: white;
+            border-radius: 4px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+            width: 260px;
+        }
+        .custom-search .widget-title {
+            background: #f5f5f5;
+            padding: 6px 10px;
+            font-size: 13px;
+            font-weight: bold;
+            border-bottom: 1px solid #ddd;
+        }
+        .custom-search select {
+            width: 100%;
+            padding: 6px 8px;
+            border: none;
+            background: white;
+            font-size: 14px;
+            cursor: pointer;
+            outline: none;
+        }
+        /* 比例尺容器：包含文字标签和比例尺微件，上下排列 */
+        .scalebar-wrapper {
+            background: rgba(255,255,255,0.9);
+            border-radius: 4px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+            padding: 4px 8px;
+            min-width: 120px;
+        }
+        .scalebar-label {
+            font-size: 12px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 4px;
+            text-align: center;
+        }
+        /* 覆盖 ArcGIS 比例尺默认样式，确保其内部边距合适 */
+        .esri-scale-bar {
+            margin: 0 !important;
+        }
+    </style>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            require([
+                "esri/Map",
+                "esri/views/MapView",
+                "esri/widgets/ScaleBar",
+                "esri/widgets/Legend",
+                "esri/widgets/LayerList",
+                "esri/layers/FeatureLayer",
+                "esri/layers/WebTileLayer"
+            ], function(Map, MapView, ScaleBar, Legend, LayerList, FeatureLayer, WebTileLayer) {
+                
+                // 1. 高德地图底图
+                const gaodeBase = new WebTileLayer({
+                    urlTemplate: "https://webrd02.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={col}&y={row}&z={level}",
+                    subDomains: ["webrd01", "webrd02", "webrd03", "webrd04"],
+                    copyright: "高德地图",
+                    title: "高德地图底图1"
+                });
+                
+                const gaodeAnno = new WebTileLayer({
+                    urlTemplate: "https://webst01.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={col}&y={row}&z={level}",
+                    subDomains: ["webst01", "webst02", "webst03", "webst04"],
+                    copyright: "高德地图",
+                    title: "高德地图底图2"
+                });
+                
+                // 2. 上海市公园绿地图层（绿色点）
+                const parkLayerUrl = "https://www.geosceneonline.cn/server/rest/services/Hosted/公园绿地_行政边界/FeatureServer";
+                const parkLayer = new FeatureLayer({
+                    url: parkLayerUrl,
+                    title: "上海市公园绿地",
+                    visible: true,
+                    renderer: {
+                        type: "simple",
+                        symbol: {
+                            type: "simple-marker",
+                            color: [76, 175, 80, 0.9],
+                            size: 8,
+                            outline: { color: [255, 255, 255], width: 1 }
+                        }
+                    }
+                });
+                
+                // 3. 公园可达性图层（浅紫色半透明）
+                const accessibilityLayerUrl = "https://www.geosceneonline.cn/server/rest/services/Hosted/可达性区域覆盖的人口/FeatureServer";
+                const accessibilityLayer = new FeatureLayer({
+                    url: accessibilityLayerUrl,
+                    title: "公园可达性",
+                    visible: true,
+                    renderer: {
+                        type: "simple",
+                        symbol: {
+                            type: "simple-fill",
+                            color: [200, 150, 255, 0.5],
+                            outline: { color: [255, 255, 255], width: 1 }
+                        }
+                    }
+                });
+                
+                // 4. 创建地图
+                const map = new Map({
+                    layers: [gaodeBase, gaodeAnno, accessibilityLayer, parkLayer]
+                });
+                
+                // 5. 创建地图视图
+                const view = new MapView({
+                    container: "viewDiv",
+                    map: map,
+                    center: [121.48, 31.22],
+                    zoom: 11
+                });
+                
+                // 6. 等待视图加载完成后添加微件
+                view.when(function() {
+                    // ---------- 比例尺（带文字标签，上下排列，不遮挡） ----------
+                    // 创建外层容器
+                    const scaleWrapper = document.createElement("div");
+                    scaleWrapper.className = "scalebar-wrapper";
+                    // 添加文字标签
+                    const labelDiv = document.createElement("div");
+                    labelDiv.className = "scalebar-label";
+                    labelDiv.innerText = " 比例尺";
+                    scaleWrapper.appendChild(labelDiv);
+                    // 创建用于放置 ScaleBar 的容器
+                    const scaleContainer = document.createElement("div");
+                    scaleWrapper.appendChild(scaleContainer);
+                    // 实例化 ScaleBar，并指定容器
+                    const scaleBar = new ScaleBar({
+                        view: view,
+                        unit: "metric",
+                        container: scaleContainer
+                    });
+                    // 将外层容器添加到地图左下角
+                    view.ui.add(scaleWrapper, "bottom-left");
+                    
+                    // ---------- 右上角容器（图例、图层列表） ----------
+                    let rightContainer = document.querySelector(".widget-container");
+                    if (!rightContainer) {
+                        rightContainer = document.createElement("div");
+                        rightContainer.className = "widget-container";
+                        document.querySelector(".map-container").appendChild(rightContainer);
+                    }
+                    
+                    // 图例卡片
+                    const legendCard = document.createElement("div");
+                    legendCard.className = "widget-card";
+                    const legendTitle = document.createElement("div");
+                    legendTitle.className = "widget-title";
+                    legendTitle.innerText = " 图例";
+                    legendCard.appendChild(legendTitle);
+                    const legendContent = document.createElement("div");
+                    legendContent.className = "widget-content";
+                    legendCard.appendChild(legendContent);
+                    rightContainer.appendChild(legendCard);
+                    const legend = new Legend({ view: view, container: legendContent });
+                    
+                    // 图层列表卡片
+                    const layerListCard = document.createElement("div");
+                    layerListCard.className = "widget-card";
+                    const layerListTitle = document.createElement("div");
+                    layerListTitle.className = "widget-title";
+                    layerListTitle.innerText = " 图层列表";
+                    layerListCard.appendChild(layerListTitle);
+                    const layerListContent = document.createElement("div");
+                    layerListContent.className = "widget-content";
+                    layerListContent.style.maxHeight = "250px";
+                    layerListContent.style.overflow = "auto";
+                    layerListCard.appendChild(layerListContent);
+                    rightContainer.appendChild(layerListCard);
+                    const layerList = new LayerList({ view: view, container: layerListContent });
+                    
+                    console.log("比例尺、图例、图层列表加载完成");
+                });
+                
+                // 7. 搜索框（带文字标签的下拉选择）
+                const searchContainer = document.createElement("div");
+                searchContainer.className = "custom-search";
+                const searchTitle = document.createElement("div");
+                searchTitle.className = "widget-title";
+                searchTitle.innerText = " 搜索框（快速定位）";
+                searchContainer.appendChild(searchTitle);
+                const select = document.createElement("select");
+                select.innerHTML = '<option value="">—— 选择地点 ——</option>';
+                const locations = [
+                    { name: "人民广场", coords: [121.477, 31.228] },
+                    { name: "外滩", coords: [121.489, 31.239] },
+                    { name: "东方明珠", coords: [121.499, 31.242] },
+                    { name: "上海迪士尼乐园", coords: [121.665, 31.144] },
+                    { name: "世纪公园", coords: [121.548, 31.214] },
+                    { name: "上海动物园", coords: [121.381, 31.192] },
+                    { name: "上海植物园", coords: [121.448, 31.149] }
+                ];
+                locations.forEach(loc => {
+                    const option = document.createElement("option");
+                    option.value = JSON.stringify(loc.coords);
+                    option.textContent = loc.name;
+                    select.appendChild(option);
+                });
+                searchContainer.appendChild(select);
+                document.querySelector(".map-container").appendChild(searchContainer);
+                
+                select.addEventListener("change", function() {
+                    if (this.value) {
+                        const coords = JSON.parse(this.value);
+                        view.goTo({ center: coords, zoom: 14 }).catch(err => console.error("定位失败", err));
+                        this.value = "";
+                    }
+                });
+                
+                // 图层加载状态提示
+                parkLayer.when(
+                    () => console.log("公园绿地图层加载成功"),
+                    (err) => console.error("公园图层加载失败", err)
+                );
+                accessibilityLayer.when(
+                    () => console.log("可达性图层加载成功"),
+                    (err) => console.error("可达性图层加载失败", err)
+                );
+            });
+        });
+    </script>
+</head>
+<body>
+    <div class="app-container">
+        <div class="header">
+            <h1>🌳 上海市公园绿地与可达性分析</h1>
+            <p>高德地图底图 | 公园绿地分布 | 可达性评估（浅紫色）</p>
+        </div>
+        <div class="map-container">
+            <div id="viewDiv"></div>
+        </div>
+        <div class="footer">
+            <span>© 2026 地理信息系统实验 | 数据来源: GeoScene Online & 高德地图</span>
+        </div>
+    </div>
+</body>
+</html>
