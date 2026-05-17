@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>诗圣杜甫的漂泊地图 · 文学视角</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        :root {
+            --bg-panel: #fdf8f0;
+            --bg-page: #f5ede0;
+            --text-primary: #3e2c1c;
+            --text-secondary: #6b5340;
+            --text-poem: #8b4513;
+            --accent-gold: #c8963e;
+            --accent-red: #b5343a;
+            --accent-green: #5a7d4a;
+            --accent-blue: #4a6d8c;
+            --accent-purple: #6b4e7a;
+            --accent-teal: #3d6b6b;
+            --border-subtle: #e0d5c5;
+            --shadow-soft: 0 4px 20px rgba(62, 44, 28, 0.12);
+            --shadow-panel: 0 0 0 1px rgba(62, 44, 28, 0.08), 0 8px 32px rgba(62, 44, 28, 0.15);
+            --radius-lg: 16px;
+            --radius-md: 10px;
+            --radius-sm: 6px;
+            --transition-smooth: 0.35s cubic-bezier(0.25, 0.1, 0.25, 1);
+            --font-title: 'Noto Serif SC', 'STSong', 'Songti SC', 'SimSun', 'KaiTi', serif;
+            --font-body: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', sans-serif;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: var(--font-body);
+            background: var(--bg-page);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        #app-container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        #map-container {
+            flex: 1 1 68%;
+            position: relative;
+            min-width: 0;
+            z-index: 1;
+            box-shadow: var(--shadow-soft);
+        }
+        #map {
+            width: 100%;
+            height: 100%;
+            background: #e8dfd3;
+        }
+
+        .map-title-overlay {
+            position: absolute;
+            top: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            pointer-events: none;
+            background: rgba(253, 248, 240, 0.92);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--border-subtle);
+            border-radius: 40px;
+            padding: 10px 28px;
+            font-family: var(--font-title);
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: 0.06em;
+            white-space: nowrap;
+            box-shadow: 0 2px 12px rgba(62, 44, 28, 0.1);
+        }
+        .shortcut-hint {
+            position: absolute;
+            bottom: 110px;
+            left: 20px;
+            z-index: 1000;
+            background: rgba(253, 248, 240, 0.7);
+            backdrop-filter: blur(4px);
+            border-radius: 20px;
+            padding: 6px 14px;
+            font-size: 0.7rem;
+            color: #8b7355;
+            border: 1px solid var(--border-subtle);
+            pointer-events: none;
+        }
+        @media (max-width: 768px) {
+            .map-title-overlay {
+                font-size: 0.9rem;
+                padding: 6px 16px;
+            }
+            .shortcut-hint {
+                bottom: 80px;
+                left: 8px;
+            }
+        }
+
+        .legend-overlay {
+            position: absolute;
+            bottom: 28px;
+            left: 20px;
+            z-index: 1000;
+            background: rgba(253, 248, 240, 0.9);
+            backdrop-filter: blur(6px);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-subtle);
+            padding: 14px 16px;
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            box-shadow: 0 2px 10px rgba(62, 44, 28, 0.08);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px 18px;
+            max-width: calc(100% - 40px);
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            white-space: nowrap;
+            cursor: pointer;
+            padding: 3px 8px;
+            border-radius: 20px;
+            transition: background 0.2s;
+        }
+        .legend-item:hover {
+            background: rgba(200, 150, 60, 0.12);
+        }
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.7);
+        }
+        @media (max-width: 768px) {
+            .legend-overlay {
+                bottom: 12px;
+                left: 8px;
+                font-size: 0.7rem;
+                padding: 10px 12px;
+                gap: 6px 10px;
+            }
+        }
+
+        #story-panel {
+            flex: 0 0 400px;
+            width: 400px;
+            height: 100%;
+            background: var(--bg-panel);
+            display: flex;
+            flex-direction: column;
+            z-index: 10;
+            box-shadow: var(--shadow-panel);
+            border-left: 1px solid var(--border-subtle);
+            overflow: hidden;
+        }
+        @media (max-width: 1024px) {
+            #story-panel {
+                flex: 0 0 350px;
+                width: 350px;
+            }
+        }
+        @media (max-width: 768px) {
+            #app-container {
+                flex-direction: column;
+            }
+            #map-container {
+                flex: 1 1 55%;
+                min-height: 300px;
+            }
+            #story-panel {
+                flex: 0 0 auto;
+                width: 100%;
+                max-height: 48%;
+                border-left: none;
+                border-top: 1px solid var(--border-subtle);
+                border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+                margin-top: -16px;
+                z-index: 20;
+            }
+        }
+
+        .panel-header {
+            padding: 16px 20px 10px;
+            border-bottom: 1px solid var(--border-subtle);
+            flex-shrink: 0;
+            background: linear-gradient(180deg, #fefcf7 0%, #fdf8f0 100%);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        .panel-header .titles {
+            flex: 1;
+        }
+        .panel-header .main-title {
+            font-family: var(--font-title);
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: 0.05em;
+        }
+        .panel-header .subtitle {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+        .panel-header .lifespan {
+            display: inline-block;
+            margin-top: 4px;
+            font-size: 0.7rem;
+            color: #8b7355;
+            background: #f5ede0;
+            padding: 2px 10px;
+            border-radius: 20px;
+        }
+        .reset-btn {
+            background: none;
+            border: 1px solid var(--border-subtle);
+            border-radius: 20px;
+            padding: 5px 12px;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: 0.2s;
+            white-space: nowrap;
+        }
+        .reset-btn:hover {
+            background: #f5ede0;
+            color: var(--text-primary);
+        }
+
+        .chapter-tabs {
+            display: flex;
+            overflow-x: auto;
+            gap: 6px;
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border-subtle);
+            flex-shrink: 0;
+            scrollbar-width: thin;
+        }
+        .chapter-tab {
+            flex-shrink: 0;
+            padding: 7px 12px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border: 1.5px solid var(--border-subtle);
+            background: #fefcf7;
+            color: var(--text-secondary);
+            transition: all 0.25s;
+            white-space: nowrap;
+        }
+        .chapter-tab:hover {
+            background: #f5ede0;
+            border-color: #c8b898;
+        }
+        .chapter-tab.active {
+            background: var(--text-primary);
+            color: #fdf8f0;
+            border-color: var(--text-primary);
+            box-shadow: 0 3px 12px rgba(62, 44, 28, 0.25);
+        }
+
+        .story-content {
+            flex: 1 1 auto;
+            overflow-y: auto;
+            padding: 16px 20px;
+            scroll-behavior: smooth;
+        }
+        .chapter-info {
+            animation: fadeSlideIn 0.45s ease;
+        }
+        @keyframes fadeSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .chapter-info .ch-stage {
+            font-size: 0.7rem;
+            letter-spacing: 0.1em;
+            color: var(--accent-gold);
+            font-weight: 700;
+        }
+        .chapter-info .ch-title {
+            font-family: var(--font-title);
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+        .chapter-info .ch-time {
+            font-size: 0.8rem;
+            color: #8b7355;
+            margin-bottom: 10px;
+            display: block;
+        }
+        .chapter-info .ch-narrative {
+            font-size: 0.9rem;
+            line-height: 1.75;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            text-align: justify;
+        }
+        .chapter-info .ch-detail {
+            background: #faf3e8;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            color: #5e4a36;
+            margin-bottom: 10px;
+            border-left: 3px solid #c8963e;
+        }
+        .chapter-info .ch-comment {
+            font-size: 0.8rem;
+            color: #7a5c3e;
+            font-style: italic;
+            margin-bottom: 12px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            background: #fdf5ea;
+        }
+        .chapter-info .ch-poem-block {
+            background: #fdf5ea;
+            border-left: 3px solid var(--accent-gold);
+            padding: 12px 16px;
+            border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+            margin-bottom: 14px;
+            font-family: var(--font-title);
+            color: var(--text-poem);
+            font-size: 0.88rem;
+            line-height: 1.8;
+            position: relative;
+        }
+        .chapter-info .ch-poem-block::before {
+            content: '“';
+            position: absolute;
+            top: -10px;
+            left: 6px;
+            font-size: 2.8rem;
+            color: var(--accent-gold);
+            opacity: 0.25;
+        }
+        .chapter-info .ch-poem-source {
+            display: block;
+            text-align: right;
+            font-size: 0.7rem;
+            color: #a08060;
+            margin-top: 4px;
+        }
+
+        /* 诗歌随机卡片 */
+        .poem-card {
+            background: #fefcf7;
+            border: 1px solid #e0d5c5;
+            border-radius: 10px;
+            padding: 10px 14px;
+            margin-top: 12px;
+            font-family: var(--font-title);
+            color: var(--text-poem);
+            font-size: 0.8rem;
+            text-align: center;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .poem-card:hover {
+            background: #fdf5ea;
+        }
+        .poem-card .refresh-hint {
+            font-size: 0.65rem;
+            color: #aaa;
+            margin-top: 4px;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 8px;
+            padding: 10px 16px 14px;
+            flex-shrink: 0;
+            border-top: 1px solid var(--border-subtle);
+        }
+        .nav-btn {
+            flex: 1;
+            padding: 8px 10px;
+            border-radius: 24px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+            border: 1.5px solid var(--border-subtle);
+            background: #fefcf7;
+            color: var(--text-primary);
+            transition: all 0.25s;
+            text-align: center;
+            user-select: none;
+        }
+        .nav-btn:hover {
+            background: #f5ede0;
+        }
+        .nav-btn.primary {
+            background: var(--text-primary);
+            color: #fdf8f0;
+            border-color: var(--text-primary);
+        }
+        .nav-btn.auto {
+            background: #b5343a;
+            color: #fff;
+            border-color: #b5343a;
+        }
+        .nav-btn:disabled {
+            opacity: 0.4;
+            pointer-events: none;
+        }
+
+        /* 标记点脉冲动画 */
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(180, 100, 40, 0.6);
+            }
+            70% {
+                box-shadow: 0 0 0 14px rgba(180, 100, 40, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(180, 100, 40, 0);
+            }
+        }
+        .marker-pulse div {
+            animation: pulse 1.8s infinite;
+        }
+
+        /* 路线流动动画 */
+        .flow-line {
+            stroke-dasharray: 10 12;
+            animation: dashMove 1s linear infinite;
+        }
+        @keyframes dashMove {
+            to {
+                stroke-dashoffset: -22;
+            }
+        }
+
+        @media (max-width: 600px) {
+            #story-panel {
+                max-height: 44%;
+            }
+            .panel-header {
+                padding: 12px 14px;
+            }
+            .story-content {
+                padding: 10px 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app-container">
+        <div id="map-container">
+            <div id="map"></div>
+            <div class="map-title-overlay"> 诗圣杜甫的漂泊地图</div>
+            <div class="shortcut-hint">⌨️ ← → 切换章节 | O 总览 | A 自动导览</div>
+            <div class="legend-overlay" id="legend"></div>
+        </div>
+
+        <div id="story-panel">
+            <div class="panel-header">
+                <div class="titles">
+                    <div class="main-title">杜甫漂泊地图</div>
+                    <div class="subtitle">以文学视角追溯诗圣足迹</div>
+                    <span class="lifespan">公元712年 — 770年</span>
+                </div>
+                <button class="reset-btn" id="btnReset" title="回到当前章节视角">📍 复位</button>
+            </div>
+            <div class="chapter-tabs" id="chapterTabs"></div>
+            <div class="story-content" id="storyContent"></div>
+            <div class="nav-buttons">
+                <button class="nav-btn" id="btnPrev">◀ 上一章</button>
+                <button class="nav-btn primary" id="btnOverview"> 总览</button>
+                <button class="nav-btn auto" id="btnAutoPlay">▶ 自动导览</button>
+                <button class="nav-btn" id="btnNext">下一章 ▶</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+    </script>
+    <script>
+        (function() {
+            const gaodeTileUrl =
+                'https://wprd01.is.autonavi.com/appmaptile?x={x}&y={y}&z={z}&lang=zh_cn&size=1&scl=1&style=7';
+            const gaodeAttr = '&copy; 高德地图 | 杜甫漂泊地图 · 文学视角';
+
+            const map = L.map('map', {
+                center: [32.5, 110.5],
+                zoom: 5,
+                minZoom: 4,
+                maxZoom: 15,
+                zoomControl: true,
+                attributionControl: true,
+            });
+
+            L.tileLayer(gaodeTileUrl, {
+                attribution: gaodeAttr,
+                maxZoom: 18,
+                tileSize: 256,
+                zoomOffset: 0,
+            }).addTo(map);
+
+            const locations = {
+                gongyi: { name: '巩县（今巩义）', lat: 34.75, lng: 113.02, desc: '杜甫出生地，童年故乡。',
+                    poem: '庭前八月梨枣熟，一日上树能千回。', poemSrc: '《百忧集行》' },
+                luoyang: { name: '洛阳', lat: 34.62, lng: 112.45, desc: '少年求学之地，结识文坛名流。',
+                    poem: '往昔十四五，出游翰墨场。', poemSrc: '《壮游》' },
+                suzhou: { name: '吴越（苏州一带）', lat: 31.30, lng: 120.59, desc: '青年漫游江南，开阔眼界。',
+                    poem: '东下姑苏台，已具浮海航。', poemSrc: '《壮游》' },
+                taishan: { name: '齐赵（泰山一带）', lat: 36.25, lng: 117.10, desc: '登泰山而小天下，壮志凌云。',
+                    poem: '会当凌绝顶，一览众山小。', poemSrc: '《望岳》' },
+                changan: { name: '长安（今西安）', lat: 34.26, lng: 108.94, desc: '困守十年，求仕不得，看尽繁华与黑暗。',
+                    poem: '朱门酒肉臭，路有冻死骨。', poemSrc: '《自京赴奉先县咏怀五百字》' },
+                fuzhou: { name: '鄜州（今富县）', lat: 36.00, lng: 109.38, desc: '安史之乱中与家人分离，思念深切。',
+                    poem: '遥怜小儿女，未解忆长安。', poemSrc: '《月夜》' },
+                fengxiang: { name: '凤翔', lat: 34.52, lng: 107.39, desc: '投奔肃宗，任左拾遗，短暂参与朝政。',
+                    poem: '涕泪受拾遗，流离主恩厚。', poemSrc: '《述怀》' },
+                huazhou: { name: '华州', lat: 34.51, lng: 109.77, desc: '贬官华州司功参军，目睹民生疾苦。',
+                    poem: '三吏三别，字字血泪。', poemSrc: '《三吏》《三别》' },
+                qinzhou: { name: '秦州（今天水）', lat: 34.58, lng: 105.72, desc: '弃官西行，流寓秦州，生计艰难。',
+                    poem: '满目悲生事，因人作远游。', poemSrc: '《秦州杂诗》' },
+                tonggu: { name: '同谷（今成县）', lat: 33.75, lng: 105.73, desc: '寒冬困居同谷，饥寒交迫，作七歌。',
+                    poem: '有客有客字子美，白头乱发垂过耳。', poemSrc: '《乾元中寓居同谷县作歌七首》' },
+                chengdu: { name: '成都草堂', lat: 30.57, lng: 104.07, desc: '浣花溪畔筑草堂，度过相对安宁的岁月。',
+                    poem: '两个黄鹂鸣翠柳，一行白鹭上青天。', poemSrc: '《绝句》' },
+                kuizhou: { name: '夔州（今奉节）', lat: 31.02, lng: 109.46, desc: '晚年寓居夔州，诗艺达到巅峰。',
+                    poem: '无边落木萧萧下，不尽长江滚滚来。', poemSrc: '《登高》' },
+                jiangling: { name: '江陵（今荆州）', lat: 30.33, lng: 112.24, desc: '离开夔州，顺江而下至江陵。',
+                    poem: '亲朋无一字，老病有孤舟。', poemSrc: '《登岳阳楼》' },
+                yueyang: { name: '岳阳', lat: 29.37, lng: 113.09, desc: '登岳阳楼，感慨万千。',
+                    poem: '吴楚东南坼，乾坤日夜浮。', poemSrc: '《登岳阳楼》' },
+                changsha: { name: '长沙（潭州）', lat: 28.23, lng: 112.94, desc: '漂泊荆湘，寄居舟中。',
+                    poem: '夜醉长沙酒，晓行湘水春。', poemSrc: '《发潭州》' },
+                hengyang: { name: '衡阳', lat: 26.89, lng: 112.57, desc: '继续南行，欲往衡州投亲。',
+                    poem: '万里悲秋常作客，百年多病独登台。', poemSrc: '《登高》' },
+                leiyang: { name: '耒阳', lat: 26.42, lng: 112.86, desc: '湘江舟中，贫病交加，诗圣陨落。',
+                    poem: '战血流依旧，军声动至今。', poemSrc: '《风疾舟中伏枕书怀》' },
+            };
+
+            // 增强的章节数据：增加 stage（开端/发展/高潮/结尾）、detail、comment
+            const chapters = [{
+                id: 'ch1',
+                title: '第一章 · 壮游四方',
+                time: '公元712年—745年（1岁~34岁）',
+                stage: ' 开端',
+                narrative: '杜甫出生于河南巩县的书香门第。少年时在洛阳求学，才华初露。二十岁起漫游吴越与齐赵，登泰山、游江南，胸怀壮志。这一时期的杜甫充满对未来的憧憬，诗风豪迈奔放。',
+                detail: '开元十九年（731年），杜甫出游郇瑕（今山西临猗）。次年漫游吴越，历时数年。开元二十三年（735年）回洛阳参加进士考试，落第。后赴兖州省亲，与李白、高适同游梁宋，登吹台、琴台。',
+                comment: '闻一多评：“这时的子美，是生命的焦点，正午的太阳。”',
+                poem: '岱宗夫如何？齐鲁青未了。造化钟神秀，阴阳割昏晓。荡胸生曾云，决眦入归鸟。会当凌绝顶，一览众山小。',
+                poemSrc: '《望岳》',
+                color: '#5a7d4a',
+                colorHex: '#5a7d4a',
+                routeCoords: [
+                    [34.75, 113.02],
+                    [34.62, 112.45],
+                    [31.30, 120.59],
+                    [36.25, 117.10]
+                ],
+                markers: ['gongyi', 'luoyang', 'suzhou', 'taishan'],
+                center: [33.5, 115.5],
+                zoom: 6,
+                icon: '🏞️'
+            }, {
+                id: 'ch2',
+                title: '第二章 · 困守长安',
+                time: '公元746年—755年（35岁~44岁）',
+                stage: '🏛️ 发展',
+                narrative: '杜甫来到长安，渴望一展抱负。然而十年间屡试不第，求仕无门。他目睹了盛唐繁华之下的社会矛盾与民生疾苦，诗风逐渐转向沉郁。',
+                detail: '天宝五载（746年）杜甫到达长安。次年参加“通一艺”考试，因李林甫“野无遗贤”而落选。此后困居长安，生活窘迫，曾“卖药都市，寄食友朋”。天宝十载（751年）献《三大礼赋》，玄宗奇之，命待制集贤院，却未授实职。',
+                comment: '冯至《杜甫传》：“长安十年，是杜甫从浪漫转向现实的关键时期。”',
+                poem: '凌晨过骊山，御榻在嵽嵲。……朱门酒肉臭，路有冻死骨。荣枯咫尺异，惆怅难再述。',
+                poemSrc: '《自京赴奉先县咏怀五百字》',
+                color: '#c8963e',
+                colorHex: '#c8963e',
+                routeCoords: [
+                    [34.75, 113.02],
+                    [34.62, 112.45],
+                    [34.26, 108.94]
+                ],
+                markers: ['gongyi', 'luoyang', 'changan'],
+                center: [34.3, 109.5],
+                zoom: 7,
+                icon: '🏛️'
+            }, {
+                id: 'ch3',
+                title: '第三章 · 战火流离',
+                time: '公元755年—759年（44岁~48岁）',
+                stage: '⚔️ 高潮',
+                narrative: '安史之乱爆发，杜甫的人生被彻底改变。他从长安逃往鄜州，又只身投奔凤翔肃宗，任左拾遗。后因直言遭贬华州，最终弃官西行。在流亡途中，他写下了不朽的“三吏”“三别”。',
+                detail: '天宝十四载（755年）十一月安史之乱爆发。次年杜甫携家逃难，将家人安置在鄜州羌村。至德二载（757年）冒险逃出长安，奔赴凤翔，“麻鞋见天子，衣袖露两肘”。任左拾遗后因救房琯触怒肃宗，乾元元年（758年）被贬华州司功参军。次年弃官，开始秦州—同谷的艰难流亡。',
+                comment: '这是杜甫人生中最动荡的岁月，也是他创作最辉煌的时期之一，写下了《春望》《北征》《三吏》《三别》等不朽诗篇。',
+                poem: '国破山河在，城春草木深。感时花溅泪，恨别鸟惊心。烽火连三月，家书抵万金。白头搔更短，浑欲不胜簪。',
+                poemSrc: '《春望》',
+                color: '#b5343a',
+                colorHex: '#b5343a',
+                routeCoords: [
+                    [34.26, 108.94],
+                    [36.00, 109.38],
+                    [34.26, 108.94],
+                    [34.52, 107.39],
+                    [34.26, 108.94],
+                    [34.51, 109.77],
+                    [34.58, 105.72],
+                    [33.75, 105.73]
+                ],
+                markers: ['changan', 'fuzhou', 'fengxiang', 'huazhou', 'qinzhou', 'tonggu'],
+                center: [34.5, 107.5],
+                zoom: 7,
+                icon: '⚔️'
+            }, {
+                id: 'ch4',
+                title: '第四章 · 蜀中草堂',
+                time: '公元759年—765年（48岁~54岁）',
+                stage: '🏡 发展',
+                narrative: '历经艰险，杜甫到达成都。在友人严武帮助下，他在浣花溪畔建起草堂，度过了人生中最为安定的几年。草堂岁月，成为他苦难一生中难得的温暖记忆。',
+                detail: '乾元二年（759年）底，杜甫一家抵达成都。上元元年（760年）春，在亲友资助下建成草堂。期间严武任剑南节度使，对杜甫多有关照。宝应元年（762年）严武还朝，蜀中发生叛乱，杜甫一度逃往梓州。广德二年（764年）严武再镇蜀，杜甫归草堂，任节度参谋、检校工部员外郎。永泰元年（765年）严武去世，杜甫失去依靠，离开成都。',
+                comment: '草堂时期是杜甫诗风多样化的阶段，既有“两个黄鹂鸣翠柳”的清新，也有“安得广厦千万间”的悲悯。',
+                poem: '两个黄鹂鸣翠柳，一行白鹭上青天。窗含西岭千秋雪，门泊东吴万里船。',
+                poemSrc: '《绝句》',
+                color: '#4a6d8c',
+                colorHex: '#4a6d8c',
+                routeCoords: [
+                    [33.75, 105.73],
+                    [30.57, 104.07]
+                ],
+                markers: ['tonggu', 'chengdu'],
+                center: [30.6, 104.5],
+                zoom: 8,
+                icon: '🏡'
+            }, {
+                id: 'ch5',
+                title: '第五章 · 夔州悲歌',
+                time: '公元766年—768年（55岁~57岁）',
+                stage: '🌊 高潮',
+                narrative: '离开成都后，杜甫沿江而下，寓居夔州（今奉节）。在这里，他的诗艺达到了炉火纯青的境界。《登高》被后人誉为“古今七律第一”。',
+                detail: '大历元年（766年）暮春，杜甫移居夔州。先后居住在西阁、赤甲、瀼西草堂、东屯等地。在夔州两年间，他创作了四百三十多首诗，占现存诗作的近三成。包括《秋兴八首》《咏怀古迹五首》《登高》等巅峰之作。夔州时期是杜甫对一生经历进行深沉回望和艺术总结的时期。',
+                comment: '莫砺锋《杜甫评传》：“夔州诗是杜甫晚年艺术达到最高境界的标志，尤其是七律，可谓空前绝后。”',
+                poem: '风急天高猿啸哀，渚清沙白鸟飞回。无边落木萧萧下，不尽长江滚滚来。万里悲秋常作客，百年多病独登台。艰难苦恨繁霜鬓，潦倒新停浊酒杯。',
+                poemSrc: '《登高》',
+                color: '#6b4e7a',
+                colorHex: '#6b4e7a',
+                routeCoords: [
+                    [30.57, 104.07],
+                    [31.02, 109.46]
+                ],
+                markers: ['chengdu', 'kuizhou'],
+                center: [31.0, 107.0],
+                zoom: 7,
+                icon: '🌊'
+            }, {
+                id: 'ch6',
+                title: '第六章 · 荆湘绝唱',
+                time: '公元768年—770年（57岁~59岁）',
+                stage: '⛵ 结尾',
+                narrative: '晚年的杜甫顺江而下，漂泊于江陵、岳阳、长沙、衡阳之间。他贫病交加，大部分时间生活在船上。770年冬，在湘江的一叶孤舟中，这位伟大的诗人走完了他坎坷而光辉的一生。',
+                detail: '大历三年（768年）正月，杜甫离开夔州，沿江东下。先到江陵，后移居公安，年底到达岳阳。大历四年（769年）经潭州（长沙）到衡州（衡阳），计划投奔旧友韦之晋。但韦已调任潭州，不久去世。杜甫在潭州滞留，又遇臧玠之乱，逃往衡州。大历五年（770年）秋，欲北归，至耒阳遇大水，困于舟中。是年冬，病逝于湘江舟中，终年五十九岁。',
+                comment: '临终绝笔《风疾舟中伏枕书怀》仍念及“战血流依旧，军声动至今”，体现了诗人至死不渝的家国情怀。',
+                poem: '昔闻洞庭水，今上岳阳楼。吴楚东南坼，乾坤日夜浮。亲朋无一字，老病有孤舟。戎马关山北，凭轩涕泗流。',
+                poemSrc: '《登岳阳楼》',
+                color: '#3d6b6b',
+                colorHex: '#3d6b6b',
+                routeCoords: [
+                    [31.02, 109.46],
+                    [30.33, 112.24],
+                    [29.37, 113.09],
+                    [28.23, 112.94],
+                    [26.89, 112.57],
+                    [26.42, 112.86]
+                ],
+                markers: ['kuizhou', 'jiangling', 'yueyang', 'changsha', 'hengyang', 'leiyang'],
+                center: [28.5, 112.5],
+                zoom: 7,
+                icon: '⛵'
+            }];
+
+            // 随机诗卡片数据
+            const randomPoems = [
+                { text: '星垂平野阔，月涌大江流。', source: '《旅夜书怀》' },
+                { text: '露从今夜白，月是故乡明。', source: '《月夜忆舍弟》' },
+                { text: '随风潜入夜，润物细无声。', source: '《春夜喜雨》' },
+                { text: '笔落惊风雨，诗成泣鬼神。', source: '《寄李十二白二十韵》' },
+                { text: '尔曹身与名俱灭，不废江河万古流。', source: '《戏为六绝句》' },
+                { text: '此曲只应天上有，人间能得几回闻。', source: '《赠花卿》' },
+                { text: '正是江南好风景，落花时节又逢君。', source: '《江南逢李龟年》' },
+                { text: '出师未捷身先死，长使英雄泪满襟。', source: '《蜀相》' },
+                { text: '安得广厦千万间，大庇天下寒士俱欢颜。', source: '《茅屋为秋风所破歌》' },
+                { text: '丛菊两开他日泪，孤舟一系故园心。', source: '《秋兴八首》' },
+            ];
+
+            let currentChapterIndex = 0;
+            let allMarkers = {};
+            let allRoutes = {};
+            let highlightedRoute = null;
+            let backgroundRoutes = [];
+            let autoPlayInterval = null;
+            let currentMarkers = []; // 当前章节的标记点数组，用于脉冲
+
+            function createMarkerIcon(chapterColor, label, pulse = false) {
+                return L.divIcon({
+                    className: pulse ? 'marker-pulse' : '',
+                    html: `<div style="
+                        width:28px;height:28px;
+                        border-radius:50%;
+                        background:${chapterColor};
+                        border:3px solid #fff;
+                        box-shadow:0 2px 8px rgba(0,0,0,0.3);
+                        display:flex;
+                        align-items:center;
+                        justify-content:center;
+                        color:#fff;
+                        font-weight:700;
+                        font-size:12px;
+                        font-family:'Noto Sans SC','PingFang SC',sans-serif;
+                        cursor:pointer;
+                        transition:transform 0.2s;
+                        ${pulse ? 'animation:pulse 1.8s infinite;' : ''}
+                    ">${label}</div>`,
+                    iconSize: [28, 28],
+                    iconAnchor: [14, 14],
+                    popupAnchor: [0, -18],
+                });
+            }
+
+            function createAllMarkers() {
+                const markerNumberMap = {};
+                chapters.forEach((ch) => {
+                    ch.markers.forEach((locKey) => {
+                        if (!markerNumberMap[locKey]) {
+                            markerNumberMap[locKey] = {
+                                num: Object.keys(markerNumberMap).length + 1,
+                                color: ch.color,
+                            };
+                        }
+                    });
+                });
+
+                Object.keys(locations).forEach(key => {
+                    const loc = locations[key];
+                    const info = markerNumberMap[key] || { num: '?', color: '#888' };
+                    const marker = L.marker([loc.lat, loc.lng], {
+                        icon: createMarkerIcon(info.color, info.num, false)
+                    }).addTo(map);
+                    const popupContent = `
+                        <strong>${loc.name}</strong>
+                        ${loc.desc}
+                        <span class="popup-poem">📜 ${loc.poem}<br><small>${loc.poemSrc}</small></span>
+                    `;
+                    marker.bindPopup(popupContent, { maxWidth: 280 });
+                    allMarkers[key] = marker;
+                });
+            }
+
+            function createAllRoutes() {
+                chapters.forEach(ch => {
+                    const bgLine = L.polyline(ch.routeCoords, {
+                        color: '#d5c8b8',
+                        weight: 2,
+                        opacity: 0.5,
+                        dashArray: '6 4',
+                        interactive: false,
+                    }).addTo(map);
+                    backgroundRoutes.push(bgLine);
+
+                    const hlLine = L.polyline(ch.routeCoords, {
+                        color: ch.colorHex,
+                        weight: 5,
+                        opacity: 0,
+                        smoothFactor: 1,
+                        interactive: true,
+                        className: 'flow-line',
+                    }).addTo(map);
+                    hlLine.bindPopup(`<strong>${ch.title}</strong><br>${ch.time}`);
+                    allRoutes[ch.id] = hlLine;
+                });
+            }
+
+            function highlightChapterRoute(chapterId) {
+                Object.values(allRoutes).forEach(line => {
+                    line.setStyle({ opacity: 0, weight: 2 });
+                    line._path && line._path.classList.remove('flow-line');
+                });
+                if (allRoutes[chapterId]) {
+                    allRoutes[chapterId].setStyle({ opacity: 1, weight: 5 });
+                    allRoutes[chapterId].bringToFront();
+                    if (allRoutes[chapterId]._path) {
+                        allRoutes[chapterId]._path.classList.add('flow-line');
+                    }
+                    highlightedRoute = chapterId;
+                }
+            }
+
+            function updateLegend(activeChapterId) {
+                const legendEl = document.getElementById('legend');
+                let html = '';
+                chapters.forEach(ch => {
+                    const isActive = ch.id === activeChapterId;
+                    html += `
+                        <span class="legend-item" data-chapter="${ch.id}" style="${isActive ? 'background:rgba(200,150,60,0.18);font-weight:700;' : ''}">
+                            <span class="legend-dot" style="background:${ch.colorHex};${isActive ? 'width:12px;height:12px;box-shadow:0 0 0 4px rgba(200,150,60,0.3);' : ''}"></span>
+                            ${ch.icon} ${ch.title.replace(' · ', ' ')}
+                        </span>
+                    `;
+                });
+                legendEl.innerHTML = html;
+                legendEl.querySelectorAll('.legend-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        const chId = item.getAttribute('data-chapter');
+                        const idx = chapters.findIndex(c => c.id === chId);
+                        if (idx >= 0) switchToChapter(idx);
+                    });
+                });
+            }
+
+            // 更新标记点脉冲效果
+            function updateMarkerPulse(chapter) {
+                // 清除所有脉冲
+                Object.values(allMarkers).forEach(m => {
+                    const icon = m.getIcon();
+                    if (icon && icon.options.className === 'marker-pulse') {
+                        m.setIcon(createMarkerIcon(icon.options.html.match(/background:(#[0-9a-fA-F]+)/)?.[1] ||
+                            '#888', icon.options.html.match(/>(\w+)</)?.[1] || '?', false));
+                    }
+                });
+                // 为当前章节标记添加脉冲
+                chapter.markers.forEach(key => {
+                    const marker = allMarkers[key];
+                    if (marker) {
+                        const locColor = chapters.find(c => c.markers.includes(key))?.color || '#888';
+                        const num = Object.keys(allMarkers).indexOf(key) + 1;
+                        marker.setIcon(createMarkerIcon(locColor, String(num), true));
+                    }
+                });
+            }
+
+            function updateStoryPanel(chapterIndex) {
+                const ch = chapters[chapterIndex];
+                const contentEl = document.getElementById('storyContent');
+                const randomPoem = randomPoems[Math.floor(Math.random() * randomPoems.length)];
+                contentEl.innerHTML = `
+                    <div class="chapter-info">
+                        <div class="ch-stage">${ch.stage}</div>
+                        <div class="ch-title">${ch.icon} ${ch.title}</div>
+                        <span class="ch-time">📅 ${ch.time}</span>
+                        <p class="ch-narrative">${ch.narrative}</p>
+                        <div class="ch-detail"><strong>📖 历史细节：</strong>${ch.detail}</div>
+                        <div class="ch-comment">💬 ${ch.comment}</div>
+                        <div class="ch-poem-block">
+                            ${ch.poem}
+                            <span class="ch-poem-source">—— ${ch.poemSrc}</span>
+                        </div>
+                        <p style="font-size:0.75rem;color:#a09080;margin-top:6px;">
+                            📍 本章地点：${ch.markers.map(k => locations[k].name).join(' → ')}
+                        </p>
+                        <div class="poem-card" id="randomPoemCard" title="点击刷新">
+                            🎋 ${randomPoem.text}<br>
+                            <span class="ch-poem-source">${randomPoem.source}</span>
+                            <div class="refresh-hint">点击刷新诗句</div>
+                        </div>
+                    </div>
+                `;
+                contentEl.scrollTop = 0;
+                document.getElementById('randomPoemCard').addEventListener('click', () => {
+                    const newPoem = randomPoems[Math.floor(Math.random() * randomPoems.length)];
+                    document.getElementById('randomPoemCard').innerHTML = `
+                        🎋 ${newPoem.text}<br>
+                        <span class="ch-poem-source">${newPoem.source}</span>
+                        <div class="refresh-hint">点击刷新诗句</div>
+                    `;
+                });
+
+                const tabsEl = document.getElementById('chapterTabs');
+                tabsEl.querySelectorAll('.chapter-tab').forEach((tab, i) => tab.classList.toggle('active', i ===
+                    chapterIndex));
+                document.getElementById('btnPrev').disabled = (chapterIndex === 0);
+                document.getElementById('btnNext').disabled = (chapterIndex === chapters.length - 1);
+                updateLegend(ch.id);
+            }
+
+            function createChapterTabs() {
+                const tabsEl = document.getElementById('chapterTabs');
+                chapters.forEach((ch, i) => {
+                    const tab = document.createElement('span');
+                    tab.className = 'chapter-tab' + (i === 0 ? ' active' : '');
+                    tab.textContent = ch.icon + ' ' + ch.id.replace('ch', '章');
+                    tab.title = ch.title;
+                    tab.addEventListener('click', () => switchToChapter(i));
+                    tabsEl.appendChild(tab);
+                });
+            }
+
+            function switchToChapter(index) {
+                if (index < 0 || index >= chapters.length) return;
+                currentChapterIndex = index;
+                const ch = chapters[index];
+                map.flyTo([ch.center[0], ch.center[1]], ch.zoom, { duration: 1.2, easeLinearity: 0.25 });
+                highlightChapterRoute(ch.id);
+                updateMarkerPulse(ch);
+                updateStoryPanel(index);
+                setTimeout(() => {
+                    if (ch.markers.length > 0 && allMarkers[ch.markers[0]]) {
+                        allMarkers[ch.markers[0]].openPopup();
+                    }
+                }, 1400);
+            }
+
+            function showOverview() {
+                map.flyTo([32.5, 110.5], 5, { duration: 1.5 });
+                Object.values(allRoutes).forEach(line => {
+                    line.setStyle({ opacity: 0.35, weight: 3 });
+                    if (line._path) line._path.classList.remove('flow-line');
+                });
+                highlightedRoute = null;
+                Object.values(allMarkers).forEach(m => m.setIcon(createMarkerIcon('#888', '?', false)));
+                updateLegend(null);
+                const contentEl = document.getElementById('storyContent');
+                contentEl.innerHTML = `
+                    <div class="chapter-info">
+                        <div class="ch-stage">🌏 全景总览</div>
+                        <div class="ch-title">杜甫一生漂泊轨迹</div>
+                        <span class="ch-time">📅 公元712年—770年 · 历经玄宗、肃宗、代宗三朝</span>
+                        <p class="ch-narrative">
+                            杜甫（712—770），字子美，自号少陵野老，唐代伟大的现实主义诗人，被后世尊为“诗圣”。
+                            他的一生恰逢唐朝由盛转衰的历史转折期，从河南巩县到洛阳，从吴越到齐赵，从长安到成都，从夔州到荆湘——他的一生都在漂泊之中。
+                        </p>
+                        <div class="ch-detail">
+                            <strong>📊 漂泊数据：</strong><br>
+                            🧭 估计旅程：约8000里（4000公里）<br>
+                            ✍️ 现存诗作：1458首<br>
+                            🗺️ 跨越省份：河南、陕西、甘肃、四川、重庆、湖北、湖南、江西（共8省）<br>
+                            ⏳ 漂泊时间：约30年（从35岁困守长安至59岁逝世）<br>
+                            🏠 主要寓居地：洛阳、长安、秦州、同谷、成都、夔州、江陵、岳阳、长沙、衡阳、耒阳
+                        </div>
+                        <div class="ch-comment">“杜甫的一生，是一部用脚步和血泪写成的诗史。” —— 冯至</div>
+                        <div class="ch-poem-block">
+                            细草微风岸，危樯独夜舟。星垂平野阔，月涌大江流。<br>
+                            名岂文章著，官应老病休。飘飘何所似，天地一沙鸥。
+                            <span class="ch-poem-source">—— 《旅夜书怀》</span>
+                        </div>
+                    </div>
+                `;
+                contentEl.scrollTop = 0;
+                document.getElementById('chapterTabs').querySelectorAll('.chapter-tab').forEach(t => t.classList.remove(
+                    'active'));
+                document.getElementById('btnPrev').disabled = true;
+                document.getElementById('btnNext').disabled = true;
+                Object.values(allMarkers).forEach(m => m.closePopup());
+            }
+
+            function startAutoPlay() {
+                if (autoPlayInterval) return;
+                document.getElementById('btnAutoPlay').textContent = '⏸ 停止导览';
+                switchToChapter(0);
+                autoPlayInterval = setInterval(() => {
+                    if (currentChapterIndex < chapters.length - 1) {
+                        switchToChapter(currentChapterIndex + 1);
+                    } else {
+                        stopAutoPlay();
+                    }
+                }, 8000);
+            }
+
+            function stopAutoPlay() {
+                if (autoPlayInterval) {
+                    clearInterval(autoPlayInterval);
+                    autoPlayInterval = null;
+                }
+                document.getElementById('btnAutoPlay').textContent = '▶ 自动导览';
+            }
+
+            document.getElementById('btnPrev').addEventListener('click', () => {
+                stopAutoPlay();
+                if (currentChapterIndex > 0) switchToChapter(currentChapterIndex - 1);
+            });
+            document.getElementById('btnNext').addEventListener('click', () => {
+                stopAutoPlay();
+                if (currentChapterIndex < chapters.length - 1) switchToChapter(currentChapterIndex + 1);
+            });
+            document.getElementById('btnOverview').addEventListener('click', () => {
+                stopAutoPlay();
+                showOverview();
+            });
+            document.getElementById('btnAutoPlay').addEventListener('click', () => {
+                if (autoPlayInterval) {
+                    stopAutoPlay();
+                } else {
+                    startAutoPlay();
+                }
+            });
+            document.getElementById('btnReset').addEventListener('click', () => {
+                stopAutoPlay();
+                if (currentChapterIndex >= 0 && currentChapterIndex < chapters.length) {
+                    const ch = chapters[currentChapterIndex];
+                    map.flyTo([ch.center[0], ch.center[1]], ch.zoom, { duration: 0.8 });
+                } else {
+                    map.flyTo([32.5, 110.5], 5, { duration: 0.8 });
+                }
+            });
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowLeft' && currentChapterIndex > 0) {
+                    e.preventDefault();
+                    stopAutoPlay();
+                    switchToChapter(currentChapterIndex - 1);
+                } else if (e.key === 'ArrowRight' && currentChapterIndex < chapters.length - 1) {
+                    e.preventDefault();
+                    stopAutoPlay();
+                    switchToChapter(currentChapterIndex + 1);
+                } else if (e.key === 'o' || e.key === 'O') {
+                    e.preventDefault();
+                    stopAutoPlay();
+                    showOverview();
+                } else if (e.key === 'a' || e.key === 'A') {
+                    e.preventDefault();
+                    if (autoPlayInterval) stopAutoPlay();
+                    else startAutoPlay();
+                }
+            });
+
+            function init() {
+                createAllMarkers();
+                createAllRoutes();
+                createChapterTabs();
+                updateLegend(chapters[0].id);
+                updateStoryPanel(0);
+                highlightChapterRoute(chapters[0].id);
+                updateMarkerPulse(chapters[0]);
+                setTimeout(() => {
+                    map.flyTo([chapters[0].center[0], chapters[0].center[1]], chapters[0].zoom, { duration: 1.0 });
+                }, 600);
+                window.addEventListener('resize', () => map.invalidateSize());
+                console.log('🖌️  诗圣杜甫的漂泊地图 · 增强版已就绪');
+                console.log('   📍 地点' + Object.keys(locations).length + '个，章节' + chapters.length + '章');
+                console.log('   ⌨️  ← → 切换 | O 总览 | A 自动导览');
+            }
+
+            init();
+        })();
+    </script>
+</body>
+</html>
